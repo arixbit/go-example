@@ -1,0 +1,6 @@
+.DS_Store
+.env
+cmd/*/.env
+bin/
+dist/
+coverage.out
