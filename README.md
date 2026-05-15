@@ -11,7 +11,7 @@ the `Example` flow used to demonstrate the app layers.
 - `cmd/migrate`: minimal GORM migration entrypoint for the example table.
 - `config`: environment loading and dependency registry.
 - `internal`: application wiring, routes, middleware, and example layers.
-- `pkg`: reusable infrastructure helpers.
+- `pkg`: reusable infrastructure helpers, including generic JWT auth.
 
 ## Run
 
