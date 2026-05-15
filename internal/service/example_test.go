@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 
 	"go-skeleton/internal/errcode"
@@ -17,12 +18,25 @@ type mockExampleRepo struct {
 	listFunc   func(ctx context.Context, limit, offset int) ([]model.Example, int64, error)
 }
 
+type mockExampleQueue struct {
+	available   bool
+	enqueueFunc func(ctx context.Context, t *asynq.Task, opts ...asynq.Option) (*asynq.TaskInfo, error)
+}
+
 func (m *mockExampleRepo) Create(ctx context.Context, example *model.Example) error {
 	return m.createFunc(ctx, example)
 }
 
 func (m *mockExampleRepo) List(ctx context.Context, limit, offset int) ([]model.Example, int64, error) {
 	return m.listFunc(ctx, limit, offset)
+}
+
+func (m *mockExampleQueue) Available() bool {
+	return m.available
+}
+
+func (m *mockExampleQueue) Enqueue(ctx context.Context, t *asynq.Task, opts ...asynq.Option) (*asynq.TaskInfo, error) {
+	return m.enqueueFunc(ctx, t, opts...)
 }
 
 func init() {
@@ -47,6 +61,47 @@ func TestCreateSuccess(t *testing.T) {
 	}
 	if example.Name != "test" {
 		t.Fatalf("expected name test, got %q", example.Name)
+	}
+}
+
+func TestEnqueueTaskSuccess(t *testing.T) {
+	var taskType string
+	queue := &mockExampleQueue{
+		available: true,
+		enqueueFunc: func(_ context.Context, t *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+			taskType = t.Type()
+			return &asynq.TaskInfo{}, nil
+		},
+	}
+	svc := NewExampleService(&mockExampleRepo{}, queue)
+
+	res, err := svc.EnqueueTask(applog.WithTraceID(context.Background(), "trace-1"), &EnqueueExampleTaskReq{Name: "test"})
+	if err != nil {
+		t.Fatalf("EnqueueTask: %v", err)
+	}
+	if !res.Queued {
+		t.Fatal("expected queued response")
+	}
+	if taskType != "example:run" {
+		t.Fatalf("expected example task type, got %q", taskType)
+	}
+}
+
+func TestEnqueueTaskQueueUnavailable(t *testing.T) {
+	queue := &mockExampleQueue{available: false}
+	svc := NewExampleService(&mockExampleRepo{}, queue)
+
+	_, err := svc.EnqueueTask(context.Background(), &EnqueueExampleTaskReq{Name: "test"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var ec errcode.Error
+	if !errors.As(err, &ec) {
+		t.Fatalf("expected errcode.Error, got %T", err)
+	}
+	if ec.Code() != errcode.QueueUnavailable.Code() {
+		t.Fatalf("expected queue unavailable code, got %d", ec.Code())
 	}
 }
 

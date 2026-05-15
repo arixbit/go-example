@@ -16,4 +16,8 @@ var (
 	InternalError = newError(9001, "INTERNAL_ERROR")
 	// DatabaseError wraps persistence failures exposed by services.
 	DatabaseError = newError(9002, "DATABASE_ERROR")
+	// QueueUnavailable means async task publishing was requested but not configured.
+	QueueUnavailable = newError(9003, "QUEUE_UNAVAILABLE")
+	// QueueError wraps async task publishing failures exposed by services.
+	QueueError = newError(9004, "QUEUE_ERROR")
 )

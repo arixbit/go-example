@@ -50,3 +50,20 @@ func (h *ExampleHandler) List(c *gin.Context) {
 
 	response.WriteSuccess(c, res)
 }
+
+// EnqueueTask handles POST /api/v1/examples/tasks.
+func (h *ExampleHandler) EnqueueTask(c *gin.Context) {
+	var req service.EnqueueExampleTaskReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(200, response.BuildValidationErrorResponse(c, err))
+		return
+	}
+
+	res, err := h.svc.EnqueueTask(c.Request.Context(), &req)
+	if err != nil {
+		response.WriteError(c, err)
+		return
+	}
+
+	response.WriteSuccess(c, res)
+}

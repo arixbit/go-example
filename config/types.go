@@ -7,6 +7,7 @@ type Config struct {
 	Server    ServerConfig
 	Postgres  PostgresConfig
 	Redis     RedisConfig
+	Auth      AuthConfig
 	Cors      CorsConfig
 	Log       LogConfig
 	RateLimit RateLimitConfig
@@ -36,6 +37,13 @@ type RedisConfig struct {
 	Password string
 	CacheDB  int
 	QueueDB  int
+}
+
+// AuthConfig holds JWT authentication settings.
+type AuthConfig struct {
+	JWTSecret string
+	JWTIssuer string
+	JWTTTL    time.Duration
 }
 
 // CorsConfig holds allowed browser origins.

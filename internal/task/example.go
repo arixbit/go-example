@@ -3,6 +3,7 @@ package task
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/hibiken/asynq"
 )
@@ -19,8 +20,13 @@ type ExamplePayload struct {
 }
 
 // NewExampleTask creates a new example task for async processing.
-func NewExampleTask(name string) (*asynq.Task, error) {
-	payload, err := json.Marshal(ExamplePayload{Name: name})
+func NewExampleTask(name string, traceID ...string) (*asynq.Task, error) {
+	p := ExamplePayload{Name: name}
+	if len(traceID) > 0 {
+		p.TraceID = strings.TrimSpace(traceID[0])
+	}
+
+	payload, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("marshal example payload: %w", err)
 	}

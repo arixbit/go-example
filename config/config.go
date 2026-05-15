@@ -36,6 +36,11 @@ func Load() *Config {
 			CacheDB:  intEnv("REDIS_CACHE_DB", 0),
 			QueueDB:  intEnv("REDIS_QUEUE_DB", 6),
 		},
+		Auth: AuthConfig{
+			JWTSecret: os.Getenv("JWT_SECRET"),
+			JWTIssuer: getEnvOrDefault("JWT_ISSUER", "go-skeleton"),
+			JWTTTL:    durationEnv("JWT_TTL", 24*time.Hour),
+		},
 		Cors: CorsConfig{
 			AllowOrigins: parseCSV(os.Getenv("CORS_ALLOW_ORIGINS")),
 		},

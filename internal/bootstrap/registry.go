@@ -9,6 +9,7 @@ import (
 
 	"go-skeleton/config"
 	"go-skeleton/internal/taskqueue"
+	"go-skeleton/pkg/auth"
 	"go-skeleton/pkg/cache"
 	"go-skeleton/pkg/database"
 )
@@ -18,6 +19,7 @@ type Registry struct {
 	Cfg   *config.Config
 	DB    *database.DBManager
 	Cache *cache.Client
+	Auth  *auth.JWTManager
 	Queue *taskqueue.Queue
 
 	queueClient *asynq.Client
@@ -67,6 +69,17 @@ func initCache(cfg *config.Config) (*cache.Client, error) {
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.CacheDB,
+	})
+}
+
+func initAuth(cfg *config.Config) (*auth.JWTManager, error) {
+	if strings.TrimSpace(cfg.Auth.JWTSecret) == "" {
+		return nil, nil
+	}
+	return auth.NewJWTManager(auth.JWTConfig{
+		Secret: cfg.Auth.JWTSecret,
+		Issuer: cfg.Auth.JWTIssuer,
+		TTL:    cfg.Auth.JWTTTL,
 	})
 }
 

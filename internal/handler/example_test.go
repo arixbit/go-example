@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 
 	"go-skeleton/internal/errcode"
@@ -30,6 +31,11 @@ type mockExampleRepo struct {
 	listFunc   func(ctx context.Context, limit, offset int) ([]model.Example, int64, error)
 }
 
+type mockExampleQueue struct {
+	available   bool
+	enqueueFunc func(ctx context.Context, t *asynq.Task, opts ...asynq.Option) (*asynq.TaskInfo, error)
+}
+
 func (m *mockExampleRepo) Create(ctx context.Context, example *model.Example) error {
 	return m.createFunc(ctx, example)
 }
@@ -38,7 +44,15 @@ func (m *mockExampleRepo) List(ctx context.Context, limit, offset int) ([]model.
 	return m.listFunc(ctx, limit, offset)
 }
 
-func setupRouter(repo service.ExampleRepository) *gin.Engine {
+func (m *mockExampleQueue) Available() bool {
+	return m.available
+}
+
+func (m *mockExampleQueue) Enqueue(ctx context.Context, t *asynq.Task, opts ...asynq.Option) (*asynq.TaskInfo, error) {
+	return m.enqueueFunc(ctx, t, opts...)
+}
+
+func setupRouter(repo service.ExampleRepository, queues ...service.ExampleQueue) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
@@ -46,10 +60,11 @@ func setupRouter(repo service.ExampleRepository) *gin.Engine {
 		c.Next()
 	})
 
-	svc := service.NewExampleService(repo)
+	svc := service.NewExampleService(repo, queues...)
 	h := NewExampleHandler(svc)
 	r.POST("/examples", h.Create)
 	r.GET("/examples", h.List)
+	r.POST("/examples/tasks", h.EnqueueTask)
 	return r
 }
 
@@ -158,5 +173,32 @@ func TestListExamplesInvalidQuery(t *testing.T) {
 	}
 	if resp.Code != errcode.InvalidParams.Code() {
 		t.Fatalf("expected validation error code, got %d", resp.Code)
+	}
+}
+
+func TestEnqueueExampleTaskSuccess(t *testing.T) {
+	queue := &mockExampleQueue{
+		available: true,
+		enqueueFunc: func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+			if task.Type() != "example:run" {
+				t.Fatalf("expected example task type, got %q", task.Type())
+			}
+			return &asynq.TaskInfo{}, nil
+		},
+	}
+	router := setupRouter(&mockExampleRepo{}, queue)
+
+	req := httptest.NewRequest(http.MethodPost, "/examples/tasks", strings.NewReader(`{"name":"test"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	var resp response.Response
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Code != 0 {
+		t.Fatalf("expected code 0, got %d", resp.Code)
 	}
 }

@@ -84,6 +84,10 @@ func messageFor(reason string) string {
 		return "request timeout"
 	case "DATABASE_ERROR":
 		return "database error"
+	case "QUEUE_UNAVAILABLE":
+		return "queue unavailable"
+	case "QUEUE_ERROR":
+		return "queue error"
 	default:
 		return "operation failed"
 	}

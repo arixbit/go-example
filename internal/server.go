@@ -27,6 +27,7 @@ var (
 
 // HTTPHandlers groups pre-constructed handlers used by the HTTP server.
 type HTTPHandlers struct {
+	Auth    *handler.AuthHandler
 	Health  *handler.HealthHandler
 	Example *handler.ExampleHandler
 }
@@ -116,9 +117,10 @@ func validateHTTPRegistry(reg *bootstrap.Registry) error {
 func newHTTPHandlers(reg *bootstrap.Registry) *HTTPHandlers {
 	db := reg.DB.DB()
 	exampleRepository := repository.NewExampleRepository(db)
-	exampleService := service.NewExampleService(exampleRepository)
+	exampleService := service.NewExampleService(exampleRepository, reg.Queue)
 
 	return &HTTPHandlers{
+		Auth:    handler.NewAuthHandler(reg.Auth),
 		Health:  handler.NewHealthHandler(reg.DB, reg.Cache),
 		Example: handler.NewExampleHandler(exampleService),
 	}
@@ -140,8 +142,15 @@ func newEngine(reg *bootstrap.Registry, handlers *HTTPHandlers, rl *middleware.I
 
 	engine.GET("/health", handlers.Health.Health)
 	api := engine.Group("/api/v1")
+
+	var authRequired gin.HandlerFunc
+	if reg.Auth != nil {
+		authRequired = middleware.BearerAuth(reg.Auth)
+	}
 	if err := router.RegisterRoutes(api, router.Dependencies{
-		Example: handlers.Example,
+		Auth:         handlers.Auth,
+		AuthRequired: authRequired,
+		Example:      handlers.Example,
 	}); err != nil {
 		return nil, err
 	}
