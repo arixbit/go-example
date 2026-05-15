@@ -10,8 +10,8 @@ import (
 	applog "go-skeleton/pkg/log"
 )
 
-// TraceLogger attaches a trace ID to each request and logs request lifecycle fields.
-func TraceLogger(auditExcludes []string) gin.HandlerFunc {
+// TraceLogger attaches a trace ID to each request and optionally logs request lifecycle fields.
+func TraceLogger(auditEnabled bool, auditExcludes []string) gin.HandlerFunc {
 	excludes := make(map[string]struct{}, len(auditExcludes))
 	for _, path := range auditExcludes {
 		if path != "" {
@@ -31,6 +31,9 @@ func TraceLogger(auditExcludes []string) gin.HandlerFunc {
 
 		c.Next()
 
+		if !auditEnabled {
+			return
+		}
 		if _, skip := excludes[c.Request.URL.Path]; skip {
 			return
 		}

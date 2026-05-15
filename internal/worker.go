@@ -7,7 +7,7 @@ import (
 	"github.com/hibiken/asynq"
 	"golang.org/x/sync/errgroup"
 
-	"go-skeleton/config"
+	"go-skeleton/internal/bootstrap"
 	"go-skeleton/internal/worker"
 )
 
@@ -18,7 +18,7 @@ type Worker struct {
 }
 
 // NewWorker wires async task handlers and the worker runtime.
-func NewWorker(reg *config.Registry) (*Worker, error) {
+func NewWorker(reg *bootstrap.Registry) (*Worker, error) {
 	if err := validateWorkerRegistry(reg); err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	return group.Wait()
 }
 
-func validateWorkerRegistry(reg *config.Registry) error {
+func validateWorkerRegistry(reg *bootstrap.Registry) error {
 	switch {
 	case reg == nil:
 		return errNilRegistry
@@ -71,7 +71,7 @@ func validateWorkerRegistry(reg *config.Registry) error {
 	}
 }
 
-func buildWorkerDeps(reg *config.Registry) *worker.Deps {
+func buildWorkerDeps(reg *bootstrap.Registry) *worker.Deps {
 	deps := &worker.Deps{
 		Cache: reg.Cache,
 		Queue: reg.Queue,

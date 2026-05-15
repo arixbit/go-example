@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORS returns a simple CORS middleware. Empty origins allow all origins.
+// CORS returns a simple allow-list based CORS middleware.
 func CORS(allowOrigins []string) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(allowOrigins))
 	for _, origin := range allowOrigins {
@@ -19,13 +19,13 @@ func CORS(allowOrigins []string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.GetHeader("Origin"))
-		if origin != "" && (len(allowed) == 0 || containsOrigin(allowed, origin)) {
+		if origin != "" && containsOrigin(allowed, origin) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Origin,Content-Type,Accept,Authorization,X-Request-ID")
+			c.Header("Access-Control-Allow-Credentials", "true")
 		}
-		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin,Content-Type,Accept,Authorization,X-Request-ID")
-		c.Header("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)

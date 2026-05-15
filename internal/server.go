@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"go-skeleton/config"
+	"go-skeleton/internal/bootstrap"
 	"go-skeleton/internal/handler"
 	"go-skeleton/internal/middleware"
 	"go-skeleton/internal/repository"
@@ -39,7 +40,7 @@ type Server struct {
 }
 
 // NewServer wires HTTP handlers, middleware, and the underlying http.Server.
-func NewServer(reg *config.Registry) (*Server, error) {
+func NewServer(reg *bootstrap.Registry) (*Server, error) {
 	if err := validateHTTPRegistry(reg); err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func validateHTTPRegistry(reg *config.Registry) error {
+func validateHTTPRegistry(reg *bootstrap.Registry) error {
 	switch {
 	case reg == nil:
 		return errNilRegistry
@@ -112,7 +113,7 @@ func validateHTTPRegistry(reg *config.Registry) error {
 	}
 }
 
-func newHTTPHandlers(reg *config.Registry) *HTTPHandlers {
+func newHTTPHandlers(reg *bootstrap.Registry) *HTTPHandlers {
 	db := reg.DB.DB()
 	exampleRepository := repository.NewExampleRepository(db)
 	exampleService := service.NewExampleService(exampleRepository)
@@ -123,13 +124,13 @@ func newHTTPHandlers(reg *config.Registry) *HTTPHandlers {
 	}
 }
 
-func newEngine(reg *config.Registry, handlers *HTTPHandlers, rl *middleware.IPRateLimiter) (*gin.Engine, error) {
+func newEngine(reg *bootstrap.Registry, handlers *HTTPHandlers, rl *middleware.IPRateLimiter) (*gin.Engine, error) {
 	engine := gin.New()
 	if err := engine.SetTrustedProxies(reg.Cfg.Server.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("set trusted proxies: %w", err)
 	}
 
-	engine.Use(middleware.TraceLogger(reg.Cfg.Log.AuditExcludes))
+	engine.Use(middleware.TraceLogger(reg.Cfg.Log.AuditEnabled, reg.Cfg.Log.AuditExcludes))
 	engine.Use(middleware.Recovery())
 	engine.Use(middleware.Timeout(reg.Cfg.Server.RequestTimeout))
 	engine.Use(middleware.CORS(reg.Cfg.Cors.AllowOrigins))

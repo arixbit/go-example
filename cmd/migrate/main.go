@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"go-skeleton/config"
+	"go-skeleton/internal/bootstrap"
 	"go-skeleton/internal/model"
 	"go-skeleton/pkg/database"
 	applog "go-skeleton/pkg/log"
@@ -16,7 +17,7 @@ import (
 func main() {
 	config.LoadEnv("cmd/migrate/.env")
 	cfg := config.Load()
-	if err := config.InitRuntime(cfg, "migrate"); err != nil {
+	if err := bootstrap.InitRuntime(cfg, "migrate"); err != nil {
 		panic(fmt.Sprintf("init runtime: %v", err))
 	}
 	defer func() { _ = applog.Sync() }()

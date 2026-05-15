@@ -12,6 +12,7 @@ import (
 
 	"go-skeleton/config"
 	app "go-skeleton/internal"
+	"go-skeleton/internal/bootstrap"
 	applog "go-skeleton/pkg/log"
 )
 
@@ -30,12 +31,12 @@ type httpServerLifecycle interface {
 func main() {
 	config.LoadEnv("cmd/api/.env")
 	cfg := config.Load()
-	if err := config.InitRuntime(cfg, "api"); err != nil {
+	if err := bootstrap.InitRuntime(cfg, "api"); err != nil {
 		panic(fmt.Sprintf("init runtime: %v", err))
 	}
 	defer func() { _ = applog.Sync() }()
 
-	registry, err := config.InitAPI(cfg)
+	registry, err := bootstrap.InitAPI(cfg)
 	if err != nil {
 		applog.L().Fatal("initialize application", zap.Error(err))
 	}
