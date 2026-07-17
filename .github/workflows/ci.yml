@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.10-alpine3.23
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4.9-alpine3.21
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_POSTGRES_DSN: postgres://app:app@127.0.0.1:5432/app?sslmode=disable&connect_timeout=5
+      TEST_REDIS_ADDR: 127.0.0.1:6379
+      TEST_REDIS_CACHE_DB: 14
+      TEST_REDIS_QUEUE_DB: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Download dependencies
+        run: go mod download
+      - name: Unit checks
+        run: make ci
+      - name: Integration tests
+        run: make test-integration
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.1
+          args: --build-tags=integration
+
+  container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Build container image
+        run: docker build --tag go-skeleton:local .
+      - name: Verify non-root runtime
+        run: test "$(docker image inspect go-skeleton:local --format '{{.Config.User}}')" = "app"
+      - name: Start Compose stack
+        run: docker compose up --detach --no-build --wait
+      - name: Smoke test API health
+        run: curl --fail --silent --show-error http://127.0.0.1:3000/health
+      - name: Smoke test database and worker
+        run: |
+          create_response="$(curl --fail --silent --show-error \
+            -X POST http://127.0.0.1:3000/api/v1/examples \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"ci-smoke"}')"
+          echo "$create_response"
+          echo "$create_response" | grep -q '"code":0'
+
+          task_response="$(curl --fail --silent --show-error \
+            -X POST http://127.0.0.1:3000/api/v1/examples/tasks \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"ci-smoke"}')"
+          echo "$task_response"
+          echo "$task_response" | grep -q '"queued":true'
+
+          for attempt in $(seq 1 20); do
+            worker_logs="$(docker compose logs --no-color worker)"
+            if echo "$worker_logs" | grep -q '"name":"ci-smoke"'; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker compose logs --no-color worker
+          exit 1
+      - name: Show Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop Compose stack
+        if: always()
+        run: docker compose down --volumes

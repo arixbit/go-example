@@ -14,10 +14,32 @@ the `Example` flow used to demonstrate the app layers.
 - `internal`: application wiring, routes, middleware, and example layers.
 - `pkg`: reusable infrastructure helpers, including generic JWT auth.
 
-## Run
+## Run with Docker Compose
+
+Start Postgres, Redis, migrations, the API, and the worker:
+
+```sh
+make compose-up
+curl http://127.0.0.1:3000/health
+```
+
+Override host ports when the defaults are already in use:
+
+```sh
+POSTGRES_PORT=55433 REDIS_PORT=56380 API_PORT=53000 make compose-up
+```
+
+Stop the stack without deleting its data volumes:
+
+```sh
+make compose-down
+```
+
+## Run Locally
 
 ```sh
 cp .env.example .env
+make migrate
 go run ./cmd/api
 ```
 
@@ -94,8 +116,30 @@ flowchart TD
 
 ## Verify
 
+Run the local CI checks (format, module state, vet, race tests, and builds):
+
 ```sh
-go test ./...
-go vet ./...
-golangci-lint run
+make ci
+```
+
+Run real Postgres, Redis cache, and Redis queue integration tests in an
+isolated Compose project:
+
+```sh
+make integration-up
+make test-integration
+make integration-down
+```
+
+The integration suite has an explicit `integration` build tag and requires
+`TEST_POSTGRES_DSN`, `TEST_REDIS_ADDR`, `TEST_REDIS_CACHE_DB`, and
+`TEST_REDIS_QUEUE_DB`. `make test-integration` supplies safe local defaults;
+CI points the same tests at its Postgres and Redis service containers.
+For concurrent worktrees, override `INTEGRATION_PROJECT`,
+`INTEGRATION_POSTGRES_PORT`, and `INTEGRATION_REDIS_PORT` with unique values.
+
+Other useful targets are listed by:
+
+```sh
+make help
 ```

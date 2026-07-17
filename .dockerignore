@@ -1,0 +1,7 @@
+.git
+.github
+.env
+cmd/*/.env
+bin
+dist
+coverage.out
